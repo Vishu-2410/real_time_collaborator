@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { ApiError } from '../utils/ApiError.js';
+import { ApiError } from '../utils/apiError.js';
 import { generateToken } from '../utils/tokenUtils.js';
 
 const SALT_ROUNDS = 10;
