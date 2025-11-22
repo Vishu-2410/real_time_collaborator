@@ -1,6 +1,6 @@
 // src/services/documentService.js
 import Document from '../models/Document.js';
-import { ApiError } from '../utils/ApiError.js';
+import { ApiError } from '../utils/apiError.js';
 
 /**
  * Docs where the user is owner or collaborator
