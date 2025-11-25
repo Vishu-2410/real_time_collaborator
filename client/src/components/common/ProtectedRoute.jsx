@@ -1,13 +1,21 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (loading) return null; // or loader
+  if (loading) return null;
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // ⭐ Save the intended page before redirecting to login
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
   }
 
   return children;

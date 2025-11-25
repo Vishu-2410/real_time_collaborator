@@ -6,7 +6,9 @@ import {
   updateDocument,
   deleteDocument,
   addCollaborator,
-  joinDocument
+  joinDocument,
+  generateShareLink,
+  getDocumentByShareId
 } from '../services/documentService.js';
 
 // GET /api/documents  → current user's docs (owner or collaborator)
@@ -109,3 +111,33 @@ export const joinDocumentController = async (req, res, next) => {
     next(error);
   }
 };
+
+// POST /api/documents/:id/share → generate a public shareable link
+export const generateShareLinkController = async (req, res, next) => {
+  try {
+    const result = await generateShareLink({
+      docId: req.params.id,
+      userId: req.user._id
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/documents/share/:shareId → open document via share link
+export const accessSharedDocumentController = async (req, res, next) => {
+  try {
+    const doc = await getDocumentByShareId({
+      shareId: req.params.shareId,
+      userId: req.user._id
+    });
+
+    res.json(doc);
+  } catch (error) {
+    next(error);
+  }
+};
+
+

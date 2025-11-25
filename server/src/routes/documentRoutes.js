@@ -8,32 +8,53 @@ import {
   updateDocumentController,
   deleteDocumentController,
   addCollaboratorController,
-  joinDocumentController
+  joinDocumentController,
+  generateShareLinkController,
+  accessSharedDocumentController
 } from '../controllers/documentController.js';
 
 const router = express.Router();
 
-// all document routes require authentication
+/*  
+|--------------------------------------------------------------------------
+|   PUBLICLY ACCESSIBLE SHARE LINK (REQUIRES LOGIN BUT NOT OWNER)
+|--------------------------------------------------------------------------
+|  IMPORTANT: This MUST be above router.use(authMiddleware)
+|  Otherwise Express tries to match `/share/:id` as a normal doc id → WRONG
+|--------------------------------------------------------------------------
+*/
+
+router.get('/share/:shareId', authMiddleware, accessSharedDocumentController);
+
+/*
+|--------------------------------------------------------------------------
+|   ALL ROUTES BELOW REQUIRE AUTH
+|--------------------------------------------------------------------------
+*/
+
 router.use(authMiddleware);
 
-// current user's docs (owner or collaborator)
+// get current user's docs
 router.get('/', getDocuments);
 
-// 🔹 all documents (everyone sees everything in the list)
+// get all docs
 router.get('/all', getAllDocumentsController);
 
-// 🔹 join a document as collaborator (current user)
-router.post('/:id/join', joinDocumentController);
-
-// create a new document
+// create new doc
 router.post('/', createNewDocument);
 
-// get / update / delete single document
+// join document as collaborator
+router.post('/:id/join', joinDocumentController);
+
+// get / update / delete doc
 router.get('/:id', getDocument);
 router.put('/:id', updateDocumentController);
 router.delete('/:id', deleteDocumentController);
 
-// add collaborator explicitly (owner only)
+// add collaborator
 router.post('/:id/collaborators', addCollaboratorController);
+
+// generate share link (owner only)
+router.post('/:id/share', generateShareLinkController);
 
 export default router;

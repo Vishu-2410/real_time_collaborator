@@ -3,41 +3,58 @@ import { getSocket } from '../socket/socketClient.js';
 import { documentApi } from '../api/documentApi.js';
 import { useAuth } from './useAuth.js';
 
-export const useDocumentEditor = (documentId) => {
+export const useDocumentEditor = (documentId, shareId) => {
   const { user } = useAuth();
+  const [realDocId, setRealDocId] = useState(documentId); // actual MongoDB _id
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [collaborators, setCollaborators] = useState([]);
   const [status, setStatus] = useState('Connecting...');
   const [loading, setLoading] = useState(true);
+
   const socketRef = useRef(null);
   const saveIntervalRef = useRef(null);
 
-  // Initial load via REST
+  // 🔹 1) Load initial document (normal or shared)
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await documentApi.get(documentId);
-        setTitle(res.data.title);
-        setContent(res.data.content);
+        let res;
+
+        if (shareId) {
+          // 🔥 open using shared link
+          res = await documentApi.getShared(shareId);
+        } else {
+          // normal
+          res = await documentApi.get(documentId);
+        }
+
+        const doc = res.data;
+        setTitle(doc.title);
+        setContent(doc.content);
+        setRealDocId(doc._id); // real Mongo ID for sockets & autosave
+
       } catch (err) {
         console.error('Error loading document:', err);
       } finally {
         setLoading(false);
       }
     };
-    load();
-  }, [documentId]);
 
-  // Socket lifecycle
+    load();
+  }, [documentId, shareId]);
+
+  // 🔹 2) Socket lifecycle (join actual doc)
   useEffect(() => {
+    if (!realDocId) return;
+
     const socket = getSocket();
     socketRef.current = socket;
 
     socket.connect();
 
     socket.emit('join-document', {
-      documentId,
+      documentId: realDocId,
       userId: user.id,
       username: user.username
     });
@@ -46,8 +63,8 @@ export const useDocumentEditor = (documentId) => {
     socket.on('disconnect', () => setStatus('Disconnected'));
 
     socket.on('load-document', ({ title, content }) => {
-      setTitle((prev) => (prev ? prev : title));
-      setContent((prev) => (prev ? prev : content));
+      setTitle(title);
+      setContent(content);
     });
 
     socket.on('receive-changes', (newContent) => {
@@ -58,31 +75,23 @@ export const useDocumentEditor = (documentId) => {
       setCollaborators(list);
     });
 
-    socket.on('user-joined', (u) => {
-      console.log('User joined:', u);
-    });
-
-    socket.on('user-left', (u) => {
-      console.log('User left:', u);
-    });
-
     return () => {
       socket.off('connect');
       socket.off('disconnect');
       socket.off('load-document');
       socket.off('receive-changes');
       socket.off('collaborators-update');
-      socket.off('user-joined');
-      socket.off('user-left');
       socket.disconnect();
     };
-  }, [documentId, user.id, user.username]);
+  }, [realDocId, user.id, user.username]);
 
-  // Auto-save every 10 seconds via REST
+  // 🔹 3) Auto-save (REST update on real doc)
   useEffect(() => {
+    if (!realDocId) return;
+
     const save = async () => {
       try {
-        await documentApi.update(documentId, { title, content });
+        await documentApi.update(realDocId, { title, content });
         console.log('Auto-saved');
       } catch (err) {
         console.error('Auto-save error:', err);
@@ -91,22 +100,26 @@ export const useDocumentEditor = (documentId) => {
 
     saveIntervalRef.current = setInterval(save, 10000);
 
-    return () => {
-      clearInterval(saveIntervalRef.current);
-    };
-  }, [documentId, title, content]);
+    return () => clearInterval(saveIntervalRef.current);
+  }, [realDocId, title, content]);
 
+  // 🔹 4) On typing update content through socket
   const updateContent = (value) => {
     setContent(value);
+
     const socket = socketRef.current;
     if (!socket) return;
 
-    socket.emit('send-changes', { documentId, content: value });
+    socket.emit('send-changes', {
+      documentId: realDocId,
+      content: value
+    });
   };
 
+  // 🔹 5) Save title once on blur
   const updateTitleOnce = async () => {
     try {
-      await documentApi.update(documentId, { title });
+      await documentApi.update(realDocId, { title });
     } catch (err) {
       console.error('Title update error:', err);
     }
@@ -120,6 +133,6 @@ export const useDocumentEditor = (documentId) => {
     updateTitleOnce,
     collaborators,
     status,
-    loading 
+    loading
   };
 };

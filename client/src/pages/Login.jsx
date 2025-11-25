@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { useAuth } from '../hooks/useAuth.js';
 import ErrorAlert from '../components/common/ErrorAlert.jsx';
@@ -7,8 +7,13 @@ import ErrorAlert from '../components/common/ErrorAlert.jsx';
 const Login = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // 🟢 Redirect user back to shared doc or editor page
+  const redirectTo = location.state?.from || "/dashboard";
 
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -17,10 +22,16 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
     try {
       const res = await authApi.login(form);
+
+      // Save login info
       login(res.data.user, res.data.token);
-      navigate('/');
+
+      // 🔥 Redirect back to the page user wanted to access
+      navigate(redirectTo, { replace: true });
+
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
     }
@@ -68,7 +79,7 @@ const Login = () => {
         </button>
 
         <p className="mt-3 text-xs text-gray-600 text-center">
-          Don&apos;t have an account?{' '}
+          Don't have an account?{' '}
           <Link to="/register" className="text-blue-600 underline">
             Register
           </Link>

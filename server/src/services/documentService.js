@@ -143,3 +143,62 @@ export const joinDocument = async ({ docId, userId }) => {
 
   return doc;
 };
+
+import crypto from 'crypto';
+
+/**
+ * Generate a public share link (like Google Docs)
+ * Only owner can enable link sharing.
+ */
+export const generateShareLink = async ({ docId, userId }) => {
+  const doc = await Document.findById(docId);
+
+  if (!doc) {
+    throw new ApiError(404, 'Document not found');
+  }
+
+  if (!doc.ownerId.equals(userId)) {
+    throw new ApiError(403, 'Only owner can create share link');
+  }
+
+  // If no share ID exists, generate a new one
+  if (!doc.shareId) {
+    doc.shareId = crypto.randomBytes(16).toString('hex');
+  }
+
+  doc.isPublic = true;
+  await doc.save();
+
+  return {
+    message: 'Share link created',
+    shareUrl: `${process.env.FRONTEND_URL}/document/share/${doc.shareId}`
+  };
+};
+
+/**
+ * Anyone with share link can join document (if isPublic=true)
+ */
+export const getDocumentByShareId = async ({ shareId, userId }) => {
+  const doc = await Document.findOne({ shareId });
+
+  if (!doc) {
+    throw new ApiError(404, 'Invalid share link');
+  }
+
+  if (!doc.isPublic) {
+    throw new ApiError(403, 'This document is not public');
+  }
+
+  // If not participant, add automatically
+  const isParticipant =
+    doc.ownerId.equals(userId) ||
+    doc.collaborators.some(c => c.equals(userId));
+
+  if (!isParticipant) {
+    doc.collaborators.push(userId);
+    await doc.save();
+  }
+
+  return doc;
+};
+

@@ -25,7 +25,17 @@ const documentSchema = new mongoose.Schema(
     lastUpdated: {
       type: Date,
       default: Date.now
-    }
+    },
+    shareId: {
+  type: String,
+  unique: true,
+  sparse: true
+},
+isPublic: {
+  type: Boolean,
+  default: false
+}
+
   },
   { timestamps: true }
 );
